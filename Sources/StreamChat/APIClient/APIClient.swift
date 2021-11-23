@@ -144,7 +144,16 @@ class APIClient {
         timeout: TimeInterval = 60,
         completion: @escaping (Result<Response, Error>) -> Void
     ) {
+        
+        var streamSdkEventData: [String: Any] = [
+            "startTime": DispatchTime.now(),
+            "endpoint": endpoint.path
+        ]
+        
         if tokenRefreshConsecutiveFailures > maxTokenRefreshAttempts {
+            
+            streamSdkEventData["error"] = "Too many Token Refresh Attempts"
+            notifySdkErrorObserver(eventData: streamSdkEventData)
             return completion(.failure(ClientError.TooManyTokenRefreshAttempts()))
         }
 
@@ -158,6 +167,8 @@ class APIClient {
                 urlRequest = try requestResult.get()
             } catch {
                 log.error(error, subsystems: .httpRequests)
+                streamSdkEventData["error"] = error
+                self?.notifySdkErrorObserver(eventData: streamSdkEventData)
                 completion(.failure(error))
                 return
             }
@@ -180,17 +191,30 @@ class APIClient {
                         error: error
                     )
                     self.tokenRefreshConsecutiveFailures = 0
+                    /// Remove this if we only want to track errors. This line is used to track startTime and endTime when the api call succeeds
+                    self.notifySdkErrorObserver(eventData: streamSdkEventData)
                     completion(.success(decodedResponse))
                 } catch {
                     if error is ClientError.ExpiredToken {
                         self.requeueRequestOnTokenExpired(endpoint: endpoint, timeout: timeout, completion: completion)
                     } else {
+                        streamSdkEventData["error"] = error
+                        self.notifySdkErrorObserver(eventData: streamSdkEventData)
                         completion(.failure(error))
                     }
                 }
             }
             task.resume()
         }
+    }
+    
+    private func notifySdkErrorObserver(eventData: [String: Any]) {
+
+        var streamSdkEventData = eventData
+        let notificationName = NSNotification.Name.init(rawValue: "StreamSDKEventNotification")
+        
+        streamSdkEventData["endTime"] = DispatchTime.now()
+        NotificationCenter.default.post(name: notificationName, object: nil, userInfo: streamSdkEventData)
     }
     
     func uploadAttachment(
