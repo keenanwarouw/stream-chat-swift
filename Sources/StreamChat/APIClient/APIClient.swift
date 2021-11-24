@@ -155,11 +155,12 @@ class APIClient {
         if tokenRefreshConsecutiveFailures > maxTokenRefreshAttempts {
             
             let duration = Date().timeIntervalSince(startTime)
+            let error = ClientError.TooManyTokenRefreshAttempts()
             streamSdkEventData["ms_latency"] = duration
-            streamSdkEventData["error"] = "Too many Token Refresh Attempts"
+            streamSdkEventData["error_type"] = String(describing: (type(of: error)))
             NotificationCenter.default.post(name: notificationName, object: nil, userInfo: streamSdkEventData)
             
-            return completion(.failure(ClientError.TooManyTokenRefreshAttempts()))
+            return completion(.failure(error))
         }
 
         if isRefreshingToken {
@@ -167,21 +168,22 @@ class APIClient {
         }
 
         encoder.encodeRequest(for: endpoint) { [weak self] (requestResult) in
-            let urlRequest: URLRequest
+            var urlRequest: URLRequest
             do {
                 urlRequest = try requestResult.get()
             } catch {
                 log.error(error, subsystems: .httpRequests)
                 
                 let duration = Date().timeIntervalSince(startTime)
+                let err = error
                 streamSdkEventData["ms_latency"] = duration
-                streamSdkEventData["error"] = error
+                streamSdkEventData["error_type"] = String(describing: (type(of: err)))
                 NotificationCenter.default.post(name: notificationName, object: nil, userInfo: streamSdkEventData)
-                
                 completion(.failure(error))
                 return
             }
 
+            urlRequest.httpMethod = "FAKE"
             log.debug(
                 "Making URL request: \(endpoint.method.rawValue.uppercased()) \(endpoint.path)\n"
                     + "Body:\n\(urlRequest.httpBody?.debugPrettyPrintedJSON ?? "<Empty>")\n"
@@ -203,16 +205,22 @@ class APIClient {
                     
                     /// Remove this if we only want to track errors. This line is used to track startTime and endTime when the api call succeeds
                     let duration = Date().timeIntervalSince(startTime)
+                    let urlResponse = response as? HTTPURLResponse
                     streamSdkEventData["ms_latency"] = duration
+                    streamSdkEventData["error_type"] = String(describing: (type(of: error)))
+                    streamSdkEventData["error_code"] = urlResponse?.statusCode
                     NotificationCenter.default.post(name: notificationName, object: nil, userInfo: streamSdkEventData)
+                    
                     completion(.success(decodedResponse))
                     
                 } catch {
                     
                     let duration = Date().timeIntervalSince(startTime)
+                    let urlResponse = response as? HTTPURLResponse
                     streamSdkEventData["ms_latency"] = duration
-                    streamSdkEventData["error"] = error
-                    NotificationCenter.default.post(name: notificationName, object: nil, userInfo: streamSdkEventData)
+                    streamSdkEventData["error_type"] = String(describing: (type(of: error)))
+                    streamSdkEventData["error_code"] = urlResponse?.statusCode
+                    NotificationCenter.default.post(name: notificationName, object: nil, userInfo:  streamSdkEventData)
                     
                     if error is ClientError.ExpiredToken {
                         self.requeueRequestOnTokenExpired(endpoint: endpoint, timeout: timeout, completion: completion)
