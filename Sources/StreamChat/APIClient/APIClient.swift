@@ -183,7 +183,6 @@ class APIClient {
                 return
             }
 
-            urlRequest.httpMethod = "FAKE"
             log.debug(
                 "Making URL request: \(endpoint.method.rawValue.uppercased()) \(endpoint.path)\n"
                     + "Body:\n\(urlRequest.httpBody?.debugPrettyPrintedJSON ?? "<Empty>")\n"
