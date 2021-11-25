@@ -149,7 +149,7 @@ class APIClient {
         let notificationName = NSNotification.Name.init(rawValue: "StreamSDKEventNotification")
         var streamSdkEventData: [String: Any] = [
             "endpoint"  : endpoint.path,
-            "method"    : endpoint.method
+            "method"    : endpoint.method.rawValue
         ]
         
         if tokenRefreshConsecutiveFailures > maxTokenRefreshAttempts {
