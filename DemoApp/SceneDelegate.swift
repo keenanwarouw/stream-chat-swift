@@ -24,7 +24,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         coordinator = DemoAppCoordinator(navigationController: navigationController)
 
         UNUserNotificationCenter.current().delegate = coordinator
-
+        let notificationName = NSNotification.Name.init(rawValue: "StreamSDKEventNotification")
+        NotificationCenter.default.addObserver(self, selector: #selector(didReceiveSdkEvent(_:)), name: notificationName, object: nil)
         if let notificationResponse = connectionOptions.notificationResponse {
             print("debugging: \(notificationResponse)")
             print("debugging: \(notificationResponse.actionIdentifier)")
@@ -37,6 +38,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}
+    
+    @objc func didReceiveSdkEvent(_ notification: NSNotification) {
+        
+        print(" notification: \(notification.userInfo)")
+        
+    }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         // Called when the scene has moved from an inactive state to an active state.
